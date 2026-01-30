@@ -4,6 +4,7 @@ import os
 import sys
 from datetime import datetime
 import re
+import random
 
 # 1. 상위 폴더의 db_handler를 불러오기 위한 설정
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -91,9 +92,11 @@ col_left, col_right = st.columns([7, 3])
 with col_left:
     img_b64 = get_image_base64(IMG_CLASSROOM)
     if img_b64:
+        click_nonce = random.randint(1, 10000)
         content = f"""<div style="position: relative; display: inline-block; width: 100%;">
                         <img src="data:image/png;base64,{img_b64}" style="width: 100%; height: auto; border-radius: 10px; border: 1px solid #ddd;">"""
         for name, b in rooms_data.items():
+            target_id = f"{name}_{click_nonce}" if name == "강사님" else name
             content += f"""<a id="{name}" href="#map-section" style="
                             position: absolute; 
                             left: {b[0]}%; top: {b[1]}%; 
@@ -108,13 +111,32 @@ with col_left:
 
 # 6. 우측 정보 표시 로직
 with col_right:
-    if clicked_id == "강사님":
+    if clicked_id and "강사님" in clicked_id:
         st.subheader("👨‍🏫 강사님 정보")
+        
+        # 랜덤 재생 로직
+        bgm_folder = "miniproject/allaboutus/bgm"
+        voice_files = [f"{bgm_folder}/yes.mp3", f"{bgm_folder}/yes#2.mp3", f"{bgm_folder}/yes#3.mp3"]
+        selected_voice = random.choice(voice_files)
+        
+        # 재생 시마다 브라우저 캐시를 깨기 위한 랜덤 nonce
+        nonce = random.random()
+        
+        if os.path.exists(selected_voice):
+            with open(selected_voice, "rb") as f:
+                data = f.read()
+                b64 = base64.b64encode(data).decode()
+                # 렌더링 강제를 위해 고유한 ID(nonce)를 div에 부여
+                audio_html = f"""<div style="display:none;" id="{nonce}">
+                                    <audio autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>
+                                 </div>"""
+                st.markdown(audio_html, unsafe_allow_html=True)
+
         with st.container(border=True):
             st.write("### **김기석 강사**")
             st.write("**이메일:** instructor@example.com")
             st.divider()
-            st.info("수업 관련 질문은 쉬는 시간이나 슬랙을 이용해 주세요.")
+            st.info("질문은 쉬는 시간이나 줌 채팅을 이용해 주세요.")
 
     elif clicked_id == "간식박스":
         st.subheader("🍪 실시간 간식 현황")
