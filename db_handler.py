@@ -299,3 +299,50 @@ def delete_snack_apply(snack_id):
         return False, str(e)
     finally:
         conn.close()        
+
+def get_student_all_reservations(student_id):
+    """특정 학생의 모든 시설 예약 현황을 가져옵니다 (쿼리 오류 수정 버전)."""
+    conn = get_db_connection()
+    all_res = []
+    
+    try:
+        with conn.cursor() as cursor:
+            # 1. 프로젝트룸 예약 (6층)
+            cursor.execute("""
+                SELECT '프로젝트룸' as category, CONCAT(room_number, '호') as detail, 
+                       start_time, end_time FROM room_reservations 
+                WHERE student_id = %s AND end_time > NOW()
+            """, (student_id,))
+            all_res.extend(cursor.fetchall())
+
+            # 2. 소파 예약 (2층)
+            cursor.execute("""
+                SELECT '소파' as category, CONCAT(sofa_number, '번') as detail, 
+                       start_time, end_time FROM sofa_reservation 
+                WHERE student_id = %s AND end_time > NOW()
+            """, (student_id,))
+            all_res.extend(cursor.fetchall())
+
+            # 3. 화장실 예약 (2층/7층 분리 조회)
+            # 2층 화장실
+            cursor.execute("""
+                SELECT '화장실' as category, '2층' as detail, 
+                       start_time, end_time FROM `2_toilet_reservation` 
+                WHERE student_id = %s AND end_time > NOW()
+            """, (student_id,))
+            all_res.extend(cursor.fetchall())
+
+            # 7층 화장실
+            cursor.execute("""
+                SELECT '화장실' as category, '7층' as detail, 
+                       start_time, end_time FROM `7_toilet_reservation` 
+                WHERE student_id = %s AND end_time > NOW()
+            """, (student_id,))
+            all_res.extend(cursor.fetchall())
+
+        return pd.DataFrame(all_res, columns=['구분', '장소', '시작시간', '종료시간'])
+    except Exception as e:
+        print(f"조회 에러: {e}")
+        return pd.DataFrame()
+    finally:
+        conn.close()

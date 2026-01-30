@@ -153,7 +153,7 @@ with col_right:
         st.divider()
 
         # 2. 간식 신청 Expander
-        with st.expander("➕ 먹고 싶은 간식 신청하기", expanded=True):
+        with st.expander("먹고 싶은 간식 신청하기", expanded=True):
             # A. 신청 현황 리스트 (Expander 최상단)
             st.markdown("**📅 최근 신청 내역**")
             df_apply = db_handler.get_snack_apply_list()
@@ -181,6 +181,32 @@ with col_right:
                         st.error(msg)
                 else:
                     st.warning("이름과 간식명을 입력해주세요.")
+        with st.expander("🗑️ 신청 내역 취소하기", expanded=False):
+            df_apply = db_handler.get_snack_apply_list()
+            
+            if not df_apply.empty:
+                st.write("본인이 신청한 내역을 선택하여 취소하세요.")
+                
+                # 셀렉트박스에 표시할 문구 생성 (신청자명 - 간식명 조합)
+                # ID값을 숨겨두었다가 삭제 시 활용합니다.
+                cancel_options = {
+                    f"[{row['신청자']}] {row['간식명']} ({row['수량']}개)": row['snack_id'] 
+                    for _, row in df_apply.iterrows()
+                }
+                
+                target_label = st.selectbox("취소할 항목 선택", options=list(cancel_options.keys()))
+                target_id = cancel_options[target_label]
+                
+                # 삭제 버튼 (빨간색 강조)
+                if st.button("선택한 신청 취소하기", use_container_width=True, type="primary"):
+                    success, msg = db_handler.delete_snack_apply(target_id)
+                    if success:
+                        st.success(msg)
+                        st.rerun() # 목록 갱신을 위해 즉시 새로고침
+                    else:
+                        st.error(msg)
+            else:
+                st.info("현재 취소할 수 있는 신청 내역이 없습니다.")
 
     elif "책상" in clicked_id:
         st.subheader(f"📍 {clicked_id}")
@@ -206,6 +232,16 @@ with col_right:
                     st.write(f"**📞 연락처:** {s['phone']}")
                     st.write(f"**📧 이메일:** {s['email']}")
                     st.write(f"**🎓 구분:** {s['major']}")
+                with st.expander("📅 현재 학생의 예약 현황 보기"):
+                    df_res_all = db_handler.get_student_all_reservations(s['student_id'])
+                    
+                    if not df_res_all.empty:
+                        # 시간 포맷 예쁘게 변경
+                        df_res_all['시작시간'] = df_res_all['시작시간'].dt.strftime('%H:%M')
+                        df_res_all['종료시간'] = df_res_all['종료시간'].dt.strftime('%H:%M')
+                        st.dataframe(df_res_all, use_container_width=True, hide_index=True)
+                    else:
+                        st.info("현재 진행 중인 예약이 없습니다.")
             else:
                 st.warning("현재 배정되지 않은 빈 좌석입니다.")
         except Exception as e:

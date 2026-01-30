@@ -18,16 +18,16 @@ st.divider()
 col1, col2 = st.columns(2)
 
 with col1:
-    st.info("#### 📍 6층 프로젝트룸")
+    st.success("#### ☕ 2층 강의실")
+    st.write("- 메인 강의실 좌석 확인")
+    st.write("- 휴게 공간 안내")
+    st.write("- 2층 화장실 예약 시스템")
+
+with col2:
+    st.info("#### 📍 7층 프로젝트룸")
     st.write("- 8개의 프로젝트룸 실시간 예약 현황 확인")
     st.write("- 팀 미팅 및 개인 학습 예약")
     st.write("- 화장실 이용 현황 및 예약 기능")
-
-with col2:
-    st.success("#### ☕ 2층 강의실 & 카페테리아")
-    st.write("- 메인 강의실 좌석 확인")
-    st.write("- 카페테리아 및 휴게 공간 안내")
-    st.write("- 2층 화장실 예약 시스템")
 
 st.divider()
 
@@ -35,7 +35,7 @@ st.divider()
 st.subheader("🚀 이용 방법")
 st.markdown("""
 1.  **왼쪽 사이드바**를 확인해 주세요.
-2.  이동하고 싶은 **층(Floor 2 또는 Floor 6)**의 이름을 클릭합니다.
+2.  이동하고 싶은 **층(Floor 2 또는 Floor 7)**의 이름을 클릭합니다.
 3.  지도의 구역을 클릭하여 **예약 현황**을 확인합니다.
 4.  **비밀번호(숫자 4자리)**를 설정하여 예약을 진행하거나 취소할 수 있습니다.
 """)
