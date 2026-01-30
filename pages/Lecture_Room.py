@@ -138,13 +138,49 @@ with col_right:
             st.divider()
             st.info("질문은 쉬는 시간이나 줌 채팅을 이용해 주세요.")
 
+    # Lecture_Room.py의 col_right 내 '간식박스' 클릭 로직
+
     elif clicked_id == "간식박스":
         st.subheader("🍪 실시간 간식 현황")
+        
+        # 1. 현재 재고 현황 (기존 기능)
         try:
-            df_snack = db_handler.get_snack_inventory_status()
-            st.dataframe(df_snack, use_container_width=True, hide_index=True)
-        except Exception as e:
-            st.error(f"간식 데이터를 불러올 수 없습니다: {e}")
+            df_inventory = db_handler.get_snack_inventory_status()
+            st.dataframe(df_inventory, use_container_width=True, hide_index=True)
+        except:
+            st.error("재고 데이터를 불러올 수 없습니다.")
+
+        st.divider()
+
+        # 2. 간식 신청 Expander
+        with st.expander("➕ 먹고 싶은 간식 신청하기", expanded=True):
+            # A. 신청 현황 리스트 (Expander 최상단)
+            st.markdown("**📅 최근 신청 내역**")
+            df_apply = db_handler.get_snack_apply_list()
+            if not df_apply.empty:
+                st.dataframe(df_apply, use_container_width=True, hide_index=True)
+            else:
+                st.info("아직 신청된 내역이 없습니다.")
+                
+            st.divider()
+            
+            # B. 신청 입력란 (st.form 제거로 테두리 최소화)
+            st.markdown("**📝 새로운 간식 요청**")
+            app_name = st.text_input("본인 이름", key="snack_app_name")
+            app_snack = st.text_input("간식 이름", key="snack_app_item")
+            app_count = st.number_input("수량", min_value=1, max_value=20, value=1, key="snack_app_cnt")
+            
+            # 일반 버튼 사용하여 이중 테두리 제거
+            if st.button("신청 데이터 전송", use_container_width=True):
+                if app_name and app_snack:
+                    success, msg = db_handler.add_snack_apply(app_name, app_snack, app_count)
+                    if success:
+                        st.success(msg)
+                        st.rerun() # 목록 갱신을 위해 새로고침
+                    else:
+                        st.error(msg)
+                else:
+                    st.warning("이름과 간식명을 입력해주세요.")
 
     elif "책상" in clicked_id:
         st.subheader(f"📍 {clicked_id}")

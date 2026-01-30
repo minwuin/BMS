@@ -254,3 +254,48 @@ def get_student_info_by_desk(desk_id):
     # [핵심] params에 (desk_id,) 처럼 콤마를 찍어야 '문자열'이 아닌 '튜플'로 인식되어 
     # "not all arguments converted..." 오류가 사라집니다.
     return pd.read_sql(query, con=engine, params=(desk_id,))
+
+# db_handler.py에 유지할 함수들
+
+def get_snack_apply_list():
+    """간식 신청 현황 리스트를 가져옵니다."""
+    query = """
+        SELECT sa.snack_id, sa.snack_name as '간식명', sa.count as '수량', s.name as '신청자'
+        FROM snacks_apply sa
+        JOIN students s ON sa.apply_id = s.student_id
+        ORDER BY sa.snack_id DESC
+    """
+    # 삭를 위해 snack_id를 쿼리에 추가했습니다.
+    return pd.read_sql(query, con=engine)
+
+def add_snack_apply(student_name, snack_name, count):
+    """새로운 간식 신청을 데이터베이스에 저장합니다."""
+    student_id = get_student_id(student_name) # 기존 함수 활용
+    if not student_id:
+        return False, f"'{student_name}' 학생을 찾을 수 없습니다."
+    
+    query = "INSERT INTO snacks_apply (snack_name, count, apply_id) VALUES (%s, %s, %s)"
+    conn = get_db_connection() # 기존 커넥션 함수 활용
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query, (snack_name, count, student_id))
+        conn.commit()
+        return True, "간식 신청이 완료되었습니다!"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def delete_snack_apply(snack_id):
+    """신청한 간식 내역을 삭제합니다."""
+    query = "DELETE FROM snacks_apply WHERE snack_id = %s"
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query, (snack_id,))
+        conn.commit()
+        return True, "신청 내역이 삭제되었습니다."
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()        
