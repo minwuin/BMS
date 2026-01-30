@@ -18,7 +18,7 @@ def get_image_base64(path):
             return base64.b64encode(f.read()).decode()
     return None
 
-st.title("🏛️ 대구 스마트시티 2층 통합 관리 페이지")
+st.title("🏛️ 대구 스마트시티 2층 관리 페이지")
 st.markdown('<div id="map-section"></div>', unsafe_allow_html=True) 
 st.write("지도에서 구역을 클릭하여 상세 정보를 확인하고 예약을 진행하세요.")
 

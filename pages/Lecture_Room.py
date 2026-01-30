@@ -1,127 +1,161 @@
 import streamlit as st
-from streamlit_image_coordinates import streamlit_image_coordinates
-import pandas as pd
-import sys
+import base64
 import os
+import sys
 from datetime import datetime
+import re
 
 # 1. 상위 폴더의 db_handler를 불러오기 위한 설정
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import db_handler
 
-# 2. 페이지 설정
-st.set_page_config(page_title="2층 강의실 실시간 좌석도", layout="wide")
+from st_click_detector import click_detector 
 
-# 이미지 경로 설정 (로비 이미지와 동일한 폴더 기준)
+# 2. 페이지 설정
+st.set_page_config(layout="wide", page_title="2층 강의실 상세 현황")
+
+# 이미지 경로 설정
 IMG_CLASSROOM = r"miniproject/allaboutus/pages/classroom.png"
 
-# 세션 상태 초기화 (정보 표시용)
-if "selected_desk_id" not in st.session_state: st.session_state.selected_desk_id = None
-if "info_type" not in st.session_state: st.session_state.info_type = None
+def get_image_base64(path):
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
 
-# --- [A] 상단 제목 및 뒤로가기 ---
-col_title, col_back = st.columns([8, 2])
-with col_title:
-    st.title("🖥️ 2층 강의실 실시간 좌석도")
-with col_back:
+
+# 3. 상단 레이아웃 및 제목
+col_t, col_b = st.columns([8, 2])
+with col_t:
+    st.title("🖥️ 강의실 관리 페이지")
+    st.markdown('<div id="map-section"></div>', unsafe_allow_html=True) 
+    st.write("지도에서 구역을 클릭하여 상세 정보를 확인하고 예약을 진행하세요.")
+with col_b:
+    # 로비로 돌아가기 버튼 (Streamlit 순정 기능 사용)
     if st.button("⬅️ 로비로 돌아가기", use_container_width=True):
         st.switch_page("pages/Floor2.py")
 
-# --- [B] 하단 좌우 분할 (7:3 비율) ---
-main_col, info_col = st.columns([7, 3])
+# 4. 강의실 구역 좌표 데이터 (보내주신 비율 좌표 적용)
+# [좌측%, 상단%, 우측%, 하단%]
+rooms_data = {
+    # 책상 6~10
+    "책상 6": [55.74, 30.43, 63.56, 37.42],
+    "책상 7": [64.34, 30.49, 72.15, 37.43],
+    "책상 8": [72.95, 30.49, 80.76, 37.22],
+    "책상 9": [81.57, 30.49, 89.38, 37.22],
+    "책상 10": [90.05, 30.28, 98.12, 37.43],
+    # 책상 16~20
+    "책상 16": [55.73, 45.00, 63.53, 51.73],
+    "책상 17": [64.34, 44.79, 72.15, 51.51],
+    "책상 18": [72.82, 44.79, 80.76, 51.73],
+    "책상 19": [81.43, 44.79, 89.38, 51.73],
+    "책상 20": [90.05, 44.58, 97.99, 51.51],
+    # 책상 26~30
+    "책상 26": [55.59, 59.08, 63.53, 66.02],
+    "책상 27": [64.20, 59.29, 72.15, 66.02],
+    "책상 28": [72.82, 59.08, 80.76, 65.81],
+    "책상 29": [81.43, 58.87, 89.38, 65.81],
+    "책상 30": [90.05, 59.08, 97.99, 66.02],
+    # 1번~5번
+    "책상 1": [2.04, 30.79, 9.19, 37.15],
+    "책상 2": [10.77, 30.79, 17.99, 37.35],
+    "책상 3": [19.44, 31.20, 26.66, 37.46],
+    "책상 4": [27.85, 30.58, 35.33, 37.05],
+    "책상 5": [36.51, 30.79, 43.87, 37.15],
+    # 11번~15번
+    "책상 11": [1.97, 45.15, 9.06, 51.62],
+    "책상 12": [10.77, 45.15, 18.39, 51.52],
+    "책상 13": [19.24, 45.05, 26.66, 51.52],
+    "책상 14": [27.58, 45.15, 35.07, 51.52],
+    "책상 15": [36.51, 45.05, 43.87, 51.31],
+    # 21번~25번
+    "책상 21": [1.97, 59.32, 9.46, 65.68],
+    "책상 22": [10.64, 59.62, 17.99, 65.88],
+    "책상 23": [19.24, 59.21, 26.53, 66.09],
+    "책상 24": [27.98, 59.21, 35.07, 65.88],
+    "책상 25": [36.58, 59.32, 43.74, 66.09],
+    # 31번~35번
+    "책상 31": [2.04, 73.48, 9.59, 80.25],
+    "책상 32": [10.77, 73.68, 18.13, 80.46],
+    "책상 33": [19.24, 73.48, 26.47, 80.05],
+    "책상 34": [27.98, 73.89, 35.20, 80.25],
+    "책상 35": [36.58, 73.48, 43.67, 80.46],
+    # 기타 시설
+    "강사님": [2.23, 11.90, 17.99, 19.91],
+    "간식박스": [45.05, 87.95, 54.77, 99.13]
+}
 
-with main_col:
-    # [강의실 좌석 클릭 감지] - 팀원의 좌표 로직을 그대로 사용하기 위해 coordinates 사용
-    coords = streamlit_image_coordinates(IMG_CLASSROOM, key="classroom_map_final", use_column_width=True)
-    
-    if coords:
-        cx, cy = coords["x"], coords["y"]
-        
-        # --- [구역 체크 로직: 기존 코드 유지] ---
-        # 1. 강사님 구역 (좌측 상단)
-        if 3 <= cx <= 162 and 60 <= cy <= 125:
-            if st.session_state.info_type != "teacher":
-                st.session_state.info_type = "teacher"
-                st.session_state.selected_desk_id = None
-                st.rerun()
-        
-        # 2. 간식 구역 (중앙 하단)
-        elif 400 <= cx <= 490 and 500 <= cy <= 850:
-            if st.session_state.info_type != "snack":
-                st.session_state.info_type = "snack"
-                st.session_state.selected_desk_id = None
-                st.rerun()
-        
-        # 3. 그 외 구역 (책상 검사)
-        else:
-            # 책상 배치 기준값
-            start_x, start_y = 13, 170
-            desk_w, desk_h = 74, 48
-            gap_x, gap_y = 77, 82
-            aisle_w = 95
+# 5. 메인 레이아웃 (7:3)
+col_left, col_right = st.columns([7, 3])
 
-            try:
-                # db_handler를 통해 데이터 가져오기
-                df_desks = db_handler.get_classroom_desks()
+with col_left:
+    img_b64 = get_image_base64(IMG_CLASSROOM)
+    if img_b64:
+        content = f"""<div style="position: relative; display: inline-block; width: 100%;">
+                        <img src="data:image/png;base64,{img_b64}" style="width: 100%; height: auto; border-radius: 10px; border: 1px solid #ddd;">"""
+        for name, b in rooms_data.items():
+            content += f"""<a id="{name}" href="#map-section" style="
+                            position: absolute; 
+                            left: {b[0]}%; top: {b[1]}%; 
+                            width: {b[2]-b[0]}%; height: {b[3]-b[1]}%; 
+                            background-color: rgba(255, 255, 255, 0); 
+                            z-index: 10;"></a>"""
+        content += "</div>"
+        clicked_id = click_detector(content)
+    else:
+        st.warning("강의실 이미지를 찾을 수 없습니다.")
+        clicked_id = ""
 
-                found_id = None
-                for _, d in df_desks.iterrows():
-                    row, col = d['row_idx'], d['col_idx']
-                    sx = start_x + (col * gap_x) + (aisle_w if col >= 5 else 0)
-                    sy = start_y + (row * gap_y)
-                    
-                    if sx <= cx <= sx + desk_w and sy <= cy <= sy + desk_h:
-                        found_id = str(d['desk_id'])
-                        break
-                
-                if found_id and st.session_state.selected_desk_id != found_id:
-                    st.session_state.selected_desk_id = found_id
-                    st.session_state.info_type = "student"
-                    st.rerun()
-            except Exception as e:
-                st.error(f"데이터 조회 오류: {e}")
-
-# --- [C] 오른쪽 정보 표시 영역 ---
-with info_col:
-    st.subheader("ℹ️ 상세 정보")
-    current_info = st.session_state.get("info_type")
-
-    # 1. 강사님 정보
-    if current_info == "teacher":
-        st.success("👨‍🏫 강사님 정보")
+# 6. 우측 정보 표시 로직
+with col_right:
+    if clicked_id == "강사님":
+        st.subheader("👨‍🏫 강사님 정보")
         with st.container(border=True):
             st.write("### **김기석 강사**")
             st.write("**이메일:** instructor@example.com")
             st.divider()
-            st.caption("질문 사항은 슬랙이나 메일로 부탁드립니다.")
+            st.info("수업 관련 질문은 쉬는 시간이나 슬랙을 이용해 주세요.")
 
-    # 2. 간식 정보 표시
-    elif current_info == "snack":
-        st.success("🍪 실시간 간식 재고")
+    elif clicked_id == "간식박스":
+        st.subheader("🍪 실시간 간식 현황")
         try:
-            # db_handler의 통합 함수 호출
             df_snack = db_handler.get_snack_inventory_status()
             st.dataframe(df_snack, use_container_width=True, hide_index=True)
-        except:
-            st.error("간식 데이터를 불러올 수 없습니다.")
+        except Exception as e:
+            st.error(f"간식 데이터를 불러올 수 없습니다: {e}")
 
-    # 3. 좌석 정보 표시
-    elif current_info == "student" and st.session_state.get("selected_desk_id"):
+    elif "책상" in clicked_id:
+        st.subheader(f"📍 {clicked_id}")
+        desk_num = re.sub(r'[^0-9]', '', clicked_id)
         try:
-            # db_handler의 학생 정보 조회 함수 호출
-            df_student = db_handler.get_student_info_by_desk(st.session_state.selected_desk_id)
-
+            df_student = db_handler.get_student_info_by_desk(desk_num)
             if not df_student.empty:
                 s = df_student.iloc[0]
-                st.success(f"**좌석 {st.session_state.selected_desk_id}**")
+                st.success(f"**현재 이용자 정보**")
                 with st.container(border=True):
                     st.write(f"### 👤 {s['name']}")
-                    st.write(f"**📞 전화:** {s['phone']}")
-                    st.write(f"**🎓 전공:** {s['major']}")
+                    
+                    # 학생 번호와 성별을 한 줄에 표시 (아이콘 활용)
+                    col_sub1, col_sub2 = st.columns(2)
+                    with col_sub1:
+                        st.write(f"**🆔 학생 번호:** {s['student_id']}")
+                    with col_sub2:
+                        # gender 컬럼값('남' 또는 '여')에 따른 아이콘 처리
+                        gender_icon = "👨" if s['gender'] == '남' else "👩"
+                        st.write(f"**{gender_icon} 성별:** {s['gender']}")
+                    
+                    st.divider()
+                    st.write(f"**📞 연락처:** {s['phone']}")
+                    st.write(f"**📧 이메일:** {s['email']}")
+                    st.write(f"**🎓 구분:** {s['major']}")
             else:
-                st.warning("배정되지 않은 좌석입니다.")
-        except:
-            st.error("학생 정보 조회 실패")
-    
+                st.warning("현재 배정되지 않은 빈 좌석입니다.")
+        except Exception as e:
+            st.error(f"학생 정보를 조회하는 중 오류가 발생했습니다: {e}")
+
     else:
-        st.info("지도에서 좌석이나 구역을 클릭해 주세요.")
+        st.subheader("🗺️ 강의실 안내")
+        st.info("좌석이나 시설을 클릭하여 상세 정보를 확인하세요.")
+        st.write("- **책상**: 이용 중인 학생 정보 확인")
+        st.write("- **강사님 구역**: 강사님 프로필 확인")
+        st.write("- **간식박스**: 현재 남은 간식 재고 확인")

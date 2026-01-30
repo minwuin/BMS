@@ -241,15 +241,16 @@ def get_snack_inventory_status():
     """
     return pd.read_sql(query, con=engine)
 
+# db_handler.py 내의 함수 수정
 def get_student_info_by_desk(desk_id):
-    """
-    클릭된 좌석 ID에 배정된 학생의 상세 정보를 가져옵니다.
-    """
+    # 컬럼명을 gender로 수정
     query = """
-        SELECT s.name, s.phone, s.email, 
+        SELECT s.student_id, s.name, s.gender, s.phone, s.email, 
                CASE WHEN s.is_major = 1 THEN '전공' ELSE '비전공' END as major
         FROM desk d
-        JOIN Students s ON d.student_id = s.student_id
+        JOIN students s ON d.student_id = s.student_id
         WHERE d.desk_id = %s
     """
+    # [핵심] params에 (desk_id,) 처럼 콤마를 찍어야 '문자열'이 아닌 '튜플'로 인식되어 
+    # "not all arguments converted..." 오류가 사라집니다.
     return pd.read_sql(query, con=engine, params=(desk_id,))
